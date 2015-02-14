@@ -44,7 +44,7 @@ const uint64_t pipes[2] = { 0xF0F0F0F0E1LL, 0xF0F0F0F0D2LL }; // Define the tran
 RF24 radio(CE_PIN, CSN_PIN); // Create a Radio
 /*-----( Declare Variables )-----*/
 bool listenerStart = false;
-unsigned long initTime;
+unsigned long rrtStart;
 int photoLimit;
 int trashhold = -50;
 // serial instruction codes
@@ -78,55 +78,65 @@ void loop()
     }
   }
   
+  if ( radio.available() )
+  {
+    checkIfStartRide(); 
+  }
+  
   if(listenerStart)
   {
     checkIfFinishRide();
-  }
-  
-  if ( radio.available() )
-  {
-    Serial.println("RADIO");
-    checkIfStartRide(); 
   }
 }
 
 void checkIfStartRide()
 {
-  // Read the data payload until we've received everything
+    // Read the data payload until we've received everything
     bool done = false;
     unsigned long time = 0;
     while (!done)
     {
       // Fetch the data payload
       done = radio.read( &time, sizeof(unsigned long) );
-      initTime = millis();
     }
     
-    startWaitRide();
+    waitFinishRide();
 }
 
 void checkIfFinishRide()
 {
   if(analogRead(LDR) < photoLimit)
   {
-    Serial.print("PILOTO CHEGOU: ");
-    unsigned long time = millis();
-    unsigned long elapsedTime = time - initTime;
-    int segundos = elapsedTime/1000;
-    int milisegundos = elapsedTime - (segundos * 1000);
-    int minutos = segundos/60;
-    segundos = segundos - (minutos*60);
-    if(minutos < 10)
-    Serial.print("0");
-    Serial.print(minutos);
-    Serial.print(":");
-    if(segundos < 10)
-    Serial.print("0");
-    Serial.print(segundos);
-    Serial.print(":");
-    Serial.println(milisegundos);
-    Serial.println(elapsedTime);
-    stopWaitRide();
+    rrtStart = millis();
+    radio.stopListening();
+    
+    radio.write( &rrtStart, sizeof(unsigned long) );
+    
+    radio.startListening();
+    
+    // Wait here until we get a response, or timeout (250ms)
+    unsigned long started_waiting_at = millis();
+    bool timeout = false;
+    while ( ! radio.available() && ! timeout )
+      if (millis() - started_waiting_at > 200 )
+        timeout = true;
+
+    // Describe the results
+    if ( timeout )
+    {
+      Serial.println("Failed, response timed out.\n\r");
+    }
+    else
+    {
+      // Grab the response, compare, and send to debugging spew
+      unsigned long rtt;
+      radio.read( &rtt, sizeof(unsigned long) );
+      
+      radio.stopListening();
+      
+      rtt = millis() - rrtStart;
+      radio.write( &rtt, sizeof(unsigned long) );
+    }
   }
 }
 
@@ -144,7 +154,7 @@ void initRadio()
   radio.startListening();
 }
 
-void startWaitRide()
+void waitFinishRide()
 {
   configurePhotoLimit();
   delay(500);

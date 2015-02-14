@@ -36,15 +36,20 @@
 #define LED 7
 
 // NOTE: the "LL" at the end of the constant is "LongLong" type
-const uint64_t pipe = 0xE8E8F0F0E1LL; // Define the transmit pipe
+// Radio pipe addresses for the 2 nodes to communicate.
+const uint64_t pipes[2] = { 0xF0F0F0F0E1LL, 0xF0F0F0F0D2LL }; // Define the transmit pipe
 
 
 /*-----( Declare objects )-----*/
 RF24 radio(CE_PIN, CSN_PIN); // Create a Radio
 /*-----( Declare Variables )-----*/
-bool listenerStart = false;
+bool listenerStart = false; // Define the wait start ride
+bool listenerFinish = false; // Define the wait for the finish ride message
 int photoLimit;
 int trashhold = -50;
+unsigned long startTime;
+unsigned long finishTime;
+unsigned long realTime;
 // serial instruction codes
 // 1 - need configurate laser
 // 2 - finish configuration
@@ -84,34 +89,81 @@ void loop()
   {
     checkIfStartRide();
   }
+  
+  if(listenerFinish)
+  {
+    checkIfFinishRide();
+  }
 }
 
 void checkIfStartRide()
 {
     if(analogRead(LDR) < photoLimit)
     {
+      startTime = millis();
       Serial.print("PILOTO LARGOU: ");
-      unsigned long time = millis();
-      Serial.println(time);
+
       stopWaitRide();
       
       bool ok = false;
       
       do
       {
-        ok = radio.write( &time, sizeof(unsigned long));
+        ok = radio.write( &startTime, sizeof(unsigned long));
+        if(!ok)
+          Serial.println("retry...");
       }while(!ok);
       
-      unsigned long transmitDelay = millis() - time;
-      
-      Serial.println(transmitDelay);
-      
-      if (ok)
-        Serial.println("ok...");
-      else
-        Serial.println("failed.\n\r");
-      
+      startWaitFinishRide();      
     }
+}
+
+void checkIfFinishRide()
+{
+  if ( radio.available() )
+  {
+    finishTime = millis();
+    // if has data, read the data then send message to get the rtt
+    // Read the data payload until we've received everything
+    bool done = false;
+    unsigned long time = 0;
+    while (!done)
+    {
+      // Fetch the data payload
+      done = radio.read( &time, sizeof(unsigned long) );
+    }
+    
+    //stop the listener before transmit
+    
+    radio.stopListening();
+    
+    radio.write( &time, sizeof(unsigned long) );
+
+    radio.startListening();
+    
+    // Wait here until we get a response, or timeout (250ms)
+    unsigned long started_waiting_at = millis();
+    bool timeout = false;
+    while ( ! radio.available() && ! timeout )
+      if (millis() - started_waiting_at > 200 )
+        timeout = true;
+
+    // Describe the results
+    if ( timeout )
+    {
+      Serial.println("Failed, response timed out.\n\r");
+      realTime = (finishTime - startTime);
+    }
+    else
+    {
+      // Grab the response, compare, and send to debugging spew
+      unsigned long rtt;
+      radio.read( &rtt, sizeof(unsigned long) );
+      realTime = (finishTime - startTime) - rtt;
+    }
+    
+    finishRide();
+  } 
 }
 
 void initLaser()
@@ -123,7 +175,9 @@ void initLaser()
 void initRadio()
 {
   radio.begin();
-  radio.openWritingPipe(pipe);
+  radio.openWritingPipe(pipes[0]);
+  radio.openReadingPipe(1,pipes[1]);
+  radio.printDetails();
 }
 
 void startWaitRide()
@@ -139,6 +193,39 @@ void stopWaitRide()
 {
   listenerStart = false;
   turnLedOff();
+}
+
+void startWaitFinishRide()
+{
+  listenerFinish = true;
+  radio.startListening();
+}
+
+void finishRide()
+{
+  listenerFinish = false;
+  radio.stopListening();
+  Serial.print("FIM DE DESCIDA: ");
+  int segundos = realTime/1000;
+  int milisegundos = realTime - (segundos * 1000);
+  int minutos = segundos/60;
+  segundos = segundos - (minutos*60);
+  if(minutos < 10)
+  Serial.print("0");
+  Serial.print(minutos);
+  Serial.print(":");
+  if(segundos < 10)
+  Serial.print("0");
+  Serial.print(segundos);
+  Serial.print(":");
+  Serial.println(milisegundos);
+  for(int i =0; i<3; i++)
+  {
+      turnLedOn();
+      delay(10);
+      turnLedOff();
+      delay(10);    
+  }
 }
 
 void configurePhotoLimit()
