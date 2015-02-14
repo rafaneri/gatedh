@@ -93,6 +93,8 @@ void checkIfStartRide()
       Serial.print("PILOTO LARGOU: ");
       unsigned long time = millis();
       Serial.println(time);
+      stopWaitRide();
+      
       bool ok = false;
       
       do
@@ -100,12 +102,15 @@ void checkIfStartRide()
         ok = radio.write( &time, sizeof(unsigned long));
       }while(!ok);
       
+      unsigned long transmitDelay = millis() - time;
+      
+      Serial.println(transmitDelay);
+      
       if (ok)
         Serial.println("ok...");
       else
         Serial.println("failed.\n\r");
       
-      stopWaitRide();
     }
 }
 
