@@ -23,9 +23,7 @@
    VCC to Arduino +5V
    Signal to Arduino pin 7
    
- - V1.00 11/26/13
-   Based on examples at http://www.bajdi.com/
-   Questions: terry@yourduino.com */
+ - V1.00 14/02/15
 
 /*-----( Import needed libraries )-----*/
 #include <SPI.h>
@@ -46,7 +44,7 @@ RF24 radio(CE_PIN, CSN_PIN); // Create a Radio
 /*-----( Declare Variables )-----*/
 bool listenerStart = false;
 int photoLimit;
-int trashhold = -10;
+int trashhold = -50;
 // serial instruction codes
 // 1 - need configurate laser
 // 2 - finish configuration
@@ -64,10 +62,7 @@ void setup()
 void loop()
 {
   if(Serial.available()) {
-    
-    Serial.print("Serial Available: ");    
     serialInputInstruction = Serial.read();    
-    Serial.println(serialInputInstruction);
     
     switch (serialInputInstruction) {
       case 1:
@@ -87,12 +82,23 @@ void loop()
   
   if(listenerStart)
   {
+    checkIfStartRide();
+  }
+}
+
+void checkIfStartRide()
+{
     if(analogRead(LDR) < photoLimit)
     {
       Serial.print("PILOTO LARGOU: ");
       unsigned long time = millis();
       Serial.println(time);
-      bool ok = radio.write( &time, sizeof(unsigned long));
+      bool ok = false;
+      
+      do
+      {
+        ok = radio.write( &time, sizeof(unsigned long));
+      }while(!ok);
       
       if (ok)
         Serial.println("ok...");
@@ -101,7 +107,6 @@ void loop()
       
       stopWaitRide();
     }
-  }
 }
 
 void initLaser()
