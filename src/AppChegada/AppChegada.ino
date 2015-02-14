@@ -36,7 +36,8 @@
 #define LED 7
 
 // NOTE: the "LL" at the end of the constant is "LongLong" type
-const uint64_t pipe = 0xE8E8F0F0E1LL; // Define the transmit pipe
+// Radio pipe addresses for the 2 nodes to communicate.
+const uint64_t pipes[2] = { 0xF0F0F0F0E1LL, 0xF0F0F0F0D2LL }; // Define the transmit pipe
 
 
 /*-----( Declare objects )-----*/
@@ -138,7 +139,8 @@ void initLaser()
 void initRadio()
 {
   radio.begin();
-  radio.openReadingPipe(1,pipe);
+  radio.openWritingPipe(pipes[1]);
+  radio.openReadingPipe(1,pipes[0]);
   radio.startListening();
 }
 
