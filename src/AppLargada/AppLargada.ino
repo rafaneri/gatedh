@@ -101,7 +101,6 @@ void checkIfStartRide()
     if(analogRead(LDR) < photoLimit)
     {
       startTime = millis();
-      Serial.print("PILOTO LARGOU: ");
 
       stopWaitRide();
       
@@ -133,12 +132,10 @@ void checkIfFinishRide()
       done = radio.read( &time, sizeof(unsigned long) );
     }
     
-    //stop the listener before transmit
-    
     radio.stopListening();
     
     radio.write( &time, sizeof(unsigned long) );
-
+ 
     radio.startListening();
     
     // Wait here until we get a response, or timeout (250ms)
