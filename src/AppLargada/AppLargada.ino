@@ -38,17 +38,15 @@
 #define LED 7
 
 // NOTE: the "LL" at the end of the constant is "LongLong" type
-// Radio pipe addresses for the 2 nodes to communicate.
-const uint64_t pipes[2] = { 0xF0F0F0F0E1LL, 0xF0F0F0F0D2LL };
+const uint64_t pipe = 0xE8E8F0F0E1LL; // Define the transmit pipe
 
 
 /*-----( Declare objects )-----*/
 RF24 radio(CE_PIN, CSN_PIN); // Create a Radio
 /*-----( Declare Variables )-----*/
 bool listenerStart = false;
-bool waitToReceive = false;
 int photoLimit;
-int trashhold = -50;
+int trashhold = -10;
 // serial instruction codes
 // 1 - need configurate laser
 // 2 - finish configuration
@@ -94,43 +92,14 @@ void loop()
       Serial.print("PILOTO LARGOU: ");
       unsigned long time = millis();
       Serial.println(time);
-      
       bool ok = radio.write( &time, sizeof(unsigned long));
       
       if (ok)
-      {
         Serial.println("ok...");
-        configureRadioToReceive();
-      }
       else
-      {
         Serial.println("failed.\n\r");
-      }
       
       stopWaitRide();
-    }
-  }
-  
-  if(waitToReceive)
-  {
-    if ( radio.available() )
-    {
-      // Dump the payloads until we've gotten everything
-      unsigned long got_time;
-      bool done = false;
-      while (!done)
-      {
-        // Fetch the payload, and see if this was the last one.
-        done = radio.read( &got_time, sizeof(unsigned long) );
-
-        // Spew it
-        printf("Got payload %lu...",got_time);
-
-	// Delay just a little bit to let the other unit
-	// make the transition to receiver
-	delay(20);
-      }
-      radio.stopListening();
     }
   }
 }
@@ -144,6 +113,7 @@ void initLaser()
 void initRadio()
 {
   radio.begin();
+  radio.openWritingPipe(pipe);
 }
 
 void startWaitRide()
@@ -152,31 +122,13 @@ void startWaitRide()
   delay(500);
   turnLedOn();
   delay(500);
-  configureRadioToTransmit();
   listenerStart = true;
 }
 
 void stopWaitRide()
 {
   listenerStart = false;
-  radio.stopListening();
   turnLedOff();
-}
-
-void configureRadioToTransmit()
-{
-  radio.stopListening();
-  radio.openWritingPipe(pipes[0]);
-  radio.openReadingPipe(1,pipes[1]);
-  waitToReceive = false;
-}
-
-void configureRadioToReceive()
-{
-  radio.startListening();
-  radio.openWritingPipe(pipes[0]);
-  radio.openReadingPipe(1,pipes[1]);
-  waitToReceive = true;
 }
 
 void configurePhotoLimit()
