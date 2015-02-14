@@ -39,14 +39,14 @@
 // Radio pipe addresses for the 2 nodes to communicate.
 const uint64_t pipes[2] = { 0xF0F0F0F0E1LL, 0xF0F0F0F0D2LL }; // Define the transmit pipe
 
-
 /*-----( Declare objects )-----*/
 RF24 radio(CE_PIN, CSN_PIN); // Create a Radio
 /*-----( Declare Variables )-----*/
 bool listenerStart = false;
+bool existResult = false;
 unsigned long rrtStart;
 int photoLimit;
-int trashhold = -50;
+int trashhold = -30;
 // serial instruction codes
 // 1 - need configurate laser
 // 2 - finish configuration
@@ -78,8 +78,9 @@ void loop()
     }
   }
   
-  if ( radio.available() )
+  if ( radio.available() && !existResult )
   {
+    existResult = true;
     checkIfStartRide(); 
   }
   
@@ -109,7 +110,6 @@ void checkIfFinishRide()
   {
     rrtStart = millis();
     radio.stopListening();
-    
     radio.write( &rrtStart, sizeof(unsigned long) );
     
     radio.startListening();
@@ -137,6 +137,8 @@ void checkIfFinishRide()
       rtt = millis() - rrtStart;
       radio.write( &rtt, sizeof(unsigned long) );
     }
+    
+    stopWaitRide();
   }
 }
 
@@ -166,7 +168,9 @@ void waitFinishRide()
 void stopWaitRide()
 {
   listenerStart = false;
+  existResult = false;
   turnLedOff();
+  radio.startListening();
 }
 
 void configurePhotoLimit()
