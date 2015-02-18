@@ -46,7 +46,7 @@ RF24 radio(CE_PIN, CSN_PIN); // Create a Radio
 bool listenerStart = false; // Define the wait start ride
 bool listenerFinish = false; // Define the wait for the finish ride message
 int photoLimit;
-int trashhold = -50;
+int trashhold = -30;
 unsigned long startTime;
 unsigned long finishTime;
 unsigned long realTime;
@@ -104,14 +104,10 @@ void checkIfStartRide()
 
       stopWaitRide();
       
-      bool ok = false;
-      
-      do
-      {
-        ok = radio.write( &startTime, sizeof(unsigned long));
-        if(!ok)
-          Serial.println("retry...");
-      }while(!ok);
+      bool ok = radio.write( &startTime, sizeof(unsigned long));
+
+      if(!ok)
+        Serial.println("retry...");
       
       startWaitFinishRide();      
     }
@@ -172,9 +168,10 @@ void initLaser()
 void initRadio()
 {
   radio.begin();
+  radio.setRetries(15,15);
+  radio.setPayloadSize(8);
   radio.openWritingPipe(pipes[0]);
   radio.openReadingPipe(1,pipes[1]);
-  radio.printDetails();
 }
 
 void startWaitRide()
