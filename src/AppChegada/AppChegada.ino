@@ -151,6 +151,8 @@ void initLaser()
 void initRadio()
 {
   radio.begin();
+  radio.setRetries(15,15);
+  radio.setPayloadSize(8);
   radio.openWritingPipe(pipes[1]);
   radio.openReadingPipe(1,pipes[0]);
   radio.startListening();
